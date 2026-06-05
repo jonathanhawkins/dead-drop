@@ -6,7 +6,7 @@
 // (even on internal error) so Photon does not retry-storm us. This route is the
 // one place that actually sends; handleInbound only computes the reply.
 import { NextRequest, NextResponse } from "next/server";
-import { verifyWebhookSignature, toInboundMessage, sendText } from "@/lib/photon";
+import { verifyWebhookSignature, toInboundMessage, sendText, sendTyping } from "@/lib/photon";
 import { handleInbound } from "@/lib/loop";
 
 export const runtime = "nodejs";
@@ -59,6 +59,17 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     if (!inbound.fromPhone) {
       console.warn("[webhook] inbound has no sender phone — acking.");
       return NextResponse.json({ ok: true, ignored: "no-sender" }, { status: 200 });
+    }
+
+    // Show the "…" bubble NOW, before the slow (~10s) AI turn, so the operative
+    // sees the Handler "typing" through generation instead of a dead pause. The
+    // sendText below re-arms/stops typing around delivery; this just makes it
+    // appear early and persist. BEST-EFFORT: fully isolated so it can never block
+    // the loop, throw, or change the always-200 contract. No-ops if unsupported.
+    try {
+      await sendTyping(inbound.fromPhone, true);
+    } catch (err) {
+      console.warn("[webhook] sendTyping(true) failed (ignored — best-effort):", err);
     }
 
     const { reply } = await handleInbound(inbound);

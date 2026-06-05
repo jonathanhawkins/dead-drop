@@ -75,11 +75,55 @@ function Bubble({ msg }: { msg: TickerMessage }) {
   );
 }
 
-export interface MessageTickerProps {
-  messages: TickerMessage[];
+// The Handler "is typing" line — shown while the operative's last message is the
+// most recent on the wire (i.e. the ~10s reply is being composed). Mirrors the
+// HANDLER bubble's sky accent and left-aligns like an incoming iMessage. Pure
+// presentation; the page infers `composing` client-side, no backend signal.
+function ComposingBubble() {
+  const accent = "#38bdf8";
+  return (
+    <li
+      className="flex flex-col"
+      style={{ alignItems: "flex-start" }}
+      aria-live="polite"
+      data-composing="true"
+    >
+      <div className="flex items-center gap-2 mb-0.5 px-1">
+        <span className="text-[9px] font-bold tracking-[0.2em] uppercase" style={{ color: accent }}>
+          HANDLER
+        </span>
+        <span className="text-[9px] font-mono tabular-nums text-white/25">composing…</span>
+      </div>
+      <div
+        className="rounded-lg px-3 py-2"
+        style={{
+          background: "rgba(56,189,248,0.08)",
+          border: "1px solid rgba(56,189,248,0.28)",
+          alignSelf: "flex-start",
+        }}
+      >
+        <span className="flex items-center gap-1" aria-hidden>
+          {[0, 1, 2].map((i) => (
+            <span
+              key={i}
+              className="inline-block w-1.5 h-1.5 rounded-full animate-pulse"
+              style={{ background: accent, animationDelay: `${i * 200}ms` }}
+            />
+          ))}
+        </span>
+      </div>
+    </li>
+  );
 }
 
-export function MessageTicker({ messages }: MessageTickerProps) {
+export interface MessageTickerProps {
+  messages: TickerMessage[];
+  /** When true, render a subtle animated "HANDLER · composing…" bubble at the
+   * top of the wire to mask the Handler's ~10s reply latency. */
+  composing?: boolean;
+}
+
+export function MessageTicker({ messages, composing = false }: MessageTickerProps) {
   return (
     <section
       className="flex flex-col min-h-0 rounded-lg overflow-hidden"
@@ -91,7 +135,8 @@ export function MessageTicker({ messages }: MessageTickerProps) {
         <span className="text-[10px] uppercase tracking-[0.14em] text-white/35 font-mono">{messages.length} msgs</span>
       </header>
       <ul className="flex-1 min-h-0 overflow-y-auto p-3 flex flex-col gap-2.5">
-        {messages.length === 0 ? (
+        {composing ? <ComposingBubble /> : null}
+        {messages.length === 0 && !composing ? (
           <li className="text-[12px] text-white/25 font-mono px-1 py-6 text-center">no traffic yet…</li>
         ) : (
           messages.map((m) => <Bubble key={m.id} msg={m} />)

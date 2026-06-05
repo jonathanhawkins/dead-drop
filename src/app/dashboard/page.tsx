@@ -65,7 +65,7 @@ function BeatRail({ beat }: { beat: Beat | null }) {
 
 export default function DashboardPage() {
   const state = useDashboardState();
-  const { factsByScope, messages, reconciliations, game, status } = state;
+  const { factsByScope, scopedMessages, reconciliations, game, status } = state;
   const [pinnedSession, setPinnedSession] = useState<string>("");
   const sessionId = pinnedSession || game?.session_id || "";
 
@@ -86,6 +86,13 @@ export default function DashboardPage() {
   // next live event. Realtime then keeps everything updating in place.
 
   const beat = game?.beat ?? null;
+
+  // Pure client-side inference of the ~10s reply gap: if the most-recent wire
+  // message (ignoring system lines) is inbound, the operative just spoke and the
+  // Handler is composing a reply. scopedMessages is newest-first and already
+  // scoped to the active session, so the first non-system entry is the latest.
+  const lastWire = scopedMessages.find((m) => m.direction !== "system");
+  const handlerComposing = lastWire?.direction === "inbound";
 
   return (
     <main
@@ -142,7 +149,7 @@ export default function DashboardPage() {
         <div className="flex flex-col gap-3 min-h-0">
           <WearingPanel game={game} />
           <div className="flex-1 min-h-0">
-            <MessageTicker messages={messages} />
+            <MessageTicker messages={scopedMessages} composing={handlerComposing} />
           </div>
         </div>
       </div>

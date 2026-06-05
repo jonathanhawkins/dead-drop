@@ -55,6 +55,10 @@ export interface TickerMessage {
   channel?: string | null;
   contentType?: string | null;
   createdAt: string;
+  /** Which session/player this message belongs to — used to scope the LIVE WIRE
+   * to the active mission. System messages may carry neither. */
+  sessionId?: string | null;
+  playerId?: string | null;
 }
 
 export interface DashboardState {
@@ -193,6 +197,8 @@ function reducer(state: DashboardState, action: Action): DashboardState {
         channel: row.channel ?? null,
         contentType: row.content_type ?? null,
         createdAt: row.created_at ?? new Date().toISOString(),
+        sessionId: row.session_id ?? null,
+        playerId: row.player_id ?? null,
       };
       return { ...state, messages: [msg, ...state.messages].slice(0, MAX_MESSAGES) };
     }
@@ -266,6 +272,8 @@ function reducer(state: DashboardState, action: Action): DashboardState {
           channel: row.channel ?? null,
           contentType: row.content_type ?? null,
           createdAt: row.created_at ?? new Date().toISOString(),
+          sessionId: row.session_id ?? null,
+          playerId: row.player_id ?? null,
         });
       }
       const messages =
@@ -309,7 +317,13 @@ const EMPTY: DashboardState = {
 
 export interface UseDashboardStateResult extends DashboardState {
   status: ConnectionStatus;
+  /** Facts partitioned by scope, with the PLAYER column scoped to the ACTIVE
+   * operative (subject === game.player_id). WORLD + HANDLER·SECRET are shared
+   * (subject "world") and left unscoped. */
   factsByScope: Record<Scope, DashboardFact[]>;
+  /** Messages scoped to the ACTIVE session (plus system messages), newest first.
+   * The LIVE WIRE renders this so a previous run's traffic stays hidden. */
+  scopedMessages: TickerMessage[];
 }
 
 /**
@@ -374,15 +388,38 @@ export function useDashboardState(initial?: Partial<DashboardState>): UseDashboa
     return () => timers.forEach(clearTimeout);
   }, [state.facts]);
 
+  // Scope the PLAYER column to the active operative so a previous run's facts
+  // (still held in memory by id, for the realtime dedupe) stay hidden. WORLD and
+  // HANDLER·SECRET are shared world-truth (subject "world") — never scoped. When
+  // there's no active game yet, the player column is empty. A new game_state for
+  // a different player automatically re-scopes (this memo keys on player_id).
+  const activePlayerId = state.game?.player_id ?? null;
   const factsByScope = useMemo<Record<Scope, DashboardFact[]>>(() => {
     const buckets: Record<Scope, DashboardFact[]> = {
       world: [],
       player: [],
       "handler-secret": [],
     };
-    for (const f of state.facts) buckets[f.scope]?.push(f);
+    for (const f of state.facts) {
+      if (f.scope === "player") {
+        if (activePlayerId && f.subject === activePlayerId) buckets.player.push(f);
+        continue;
+      }
+      buckets[f.scope]?.push(f);
+    }
     return buckets;
-  }, [state.facts]);
+  }, [state.facts, activePlayerId]);
 
-  return { ...state, status, factsByScope };
+  // Scope the LIVE WIRE to the active session (keep system messages, which may
+  // carry no session_id). No active session → only system messages show. Keys on
+  // session_id so a new mission re-scopes automatically.
+  const activeSessionId = state.game?.session_id ?? null;
+  const scopedMessages = useMemo<TickerMessage[]>(() => {
+    if (!activeSessionId) return state.messages.filter((m) => m.direction === "system");
+    return state.messages.filter(
+      (m) => m.direction === "system" || m.sessionId === activeSessionId,
+    );
+  }, [state.messages, activeSessionId]);
+
+  return { ...state, status, factsByScope, scopedMessages };
 }
