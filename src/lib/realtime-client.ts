@@ -67,12 +67,6 @@ interface RawEnvelope {
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
-function publicEnv(name: string, fallback = ""): string {
-  // Next inlines process.env.NEXT_PUBLIC_* at build time for client bundles.
-  const v = process.env[name];
-  return v === undefined || v === "" ? fallback : v;
-}
-
 /**
  * A resilient realtime subscription. Construct it, call `.connect()` once, and
  * `.close()` on teardown. Safe to call methods before/after connect; everything
@@ -92,8 +86,11 @@ export class RealtimeClient {
 
   constructor(handlers: RealtimeHandlers, opts: RealtimeClientOptions = {}) {
     this.handlers = handlers;
-    this.appId = opts.appId ?? publicEnv("NEXT_PUBLIC_BUTTERBASE_APP_ID");
-    this.token = opts.token ?? publicEnv("NEXT_PUBLIC_BUTTERBASE_REALTIME_TOKEN");
+    // Static process.env.NEXT_PUBLIC_* references — Next only inlines these into
+    // the browser bundle when accessed statically. process.env[dynamicKey] is
+    // undefined client-side, which silently left the dashboard disconnected.
+    this.appId = opts.appId ?? process.env.NEXT_PUBLIC_BUTTERBASE_APP_ID ?? "";
+    this.token = opts.token ?? process.env.NEXT_PUBLIC_BUTTERBASE_REALTIME_TOKEN ?? "";
     this.tables = opts.tables ?? REALTIME_TABLES;
   }
 
