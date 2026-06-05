@@ -15,6 +15,7 @@ import type { Beat } from "@/lib/types";
 import { BEAT_ORDER } from "@/lib/types";
 import {
   ControlBar,
+  CourierPanel,
   FactColumn,
   MessageTicker,
   ReconcileBanner,
@@ -145,9 +146,13 @@ export default function DashboardPage() {
         <FactColumn scope="player" facts={factsByScope.player} />
         <FactColumn scope="handler-secret" facts={factsByScope["handler-secret"]} />
 
-        {/* Right rail: WEARING (huge) over the live wire. */}
+        {/* Right rail: WEARING (huge) over the FIELD COURIER card and the live wire. */}
         <div className="flex flex-col gap-3 min-h-0">
           <WearingPanel game={game} />
+          {/* "How it scales": the real-human courier bounty + live applicants. */}
+          <div className="shrink-0">
+            <CourierPanel />
+          </div>
           <div className="flex-1 min-h-0">
             <MessageTicker messages={scopedMessages} composing={handlerComposing} />
           </div>

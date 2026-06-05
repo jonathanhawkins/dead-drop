@@ -25,6 +25,9 @@ export interface BountyInput {
   priceType?: "fixed" | "hourly";
   agentType?: string; // "clawdbot" | "moltbot" | "other"
   category?: string;
+  // RentAHuman's location is a city-level object (no street field — put the
+  // street address in the description). Empty => remote.
+  location?: { isRemoteAllowed?: boolean; city?: string; state?: string; country?: string };
   deadline?: string; // ISO 8601
   spotsAvailable?: number; // 1–500
   identityRequired?: boolean;
@@ -61,6 +64,7 @@ function buildBody(input: BountyInput): Record<string, unknown> {
     dryRun: input.dryRun ?? false,
   };
   if (input.category) body.category = input.category;
+  if (input.location) body.location = input.location;
   if (input.deadline) body.deadline = input.deadline;
   if (input.spotsAvailable != null) body.spotsAvailable = input.spotsAvailable;
   if (input.identityRequired != null) body.identityRequired = input.identityRequired;
@@ -106,9 +110,33 @@ export async function listApplications(id: string): Promise<unknown> {
   return res.json().catch(() => null);
 }
 
+/** Take a bounty down (status → "cancelled"). Tries PATCH then POST. Never throws. */
+export async function cancelBounty(
+  id: string,
+): Promise<{ ok: boolean; error?: string; raw?: unknown }> {
+  const key = apiKey();
+  if (!key) return { ok: false, error: "RENTAHUMAN_API_KEY not set" };
+  const url = `${API_BASE}/bounties/${encodeURIComponent(id)}`;
+  const headers = { "X-API-Key": key, "Content-Type": "application/json" };
+  const body = JSON.stringify({ status: "cancelled" });
+  for (const method of ["PATCH", "POST"] as const) {
+    try {
+      const res = await fetch(url, { method, headers, body });
+      const raw = await res.json().catch(() => null);
+      if (res.ok) return { ok: true, raw };
+      if (res.status !== 404 && res.status !== 405) return { ok: false, error: `http ${res.status}`, raw };
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  }
+  return { ok: false, error: "cancel rejected (PATCH and POST both failed)" };
+}
+
 /** The canonical DEAD DROP finale bounty: a courier to hand off the envelope. */
-export function handoffBounty(opts: { price?: number; venue?: string; deadline?: string } = {}): BountyInput {
-  const venue = opts.venue || "the event venue (exact spot shared on accept)";
+export function handoffBounty(
+  opts: { price?: number; venue?: string; city?: string; state?: string; country?: string; deadline?: string } = {},
+): BountyInput {
+  const venue = opts.venue || "AWS Builder Loft · 525 Market St, San Francisco, CA 94105";
   return {
     title: "Field courier for a live game — hand off a sealed envelope (~5 min)",
     description:
@@ -125,6 +153,12 @@ export function handoffBounty(opts: { price?: number; venue?: string; deadline?:
     priceType: "fixed",
     agentType: "other",
     spotsAvailable: 1,
+    location: {
+      isRemoteAllowed: false,
+      city: opts.city || "San Francisco",
+      state: opts.state || "CA",
+      country: opts.country || "US",
+    },
     ...(opts.deadline ? { deadline: opts.deadline } : {}),
   };
 }
