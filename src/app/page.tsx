@@ -67,6 +67,12 @@ export default function Home() {
         {/* Secondary navigation */}
         <nav className="mt-8 flex w-full flex-col gap-3 sm:flex-row">
           <a
+            href="/deck"
+            className="flex flex-1 items-center justify-center rounded-lg border border-sky-500/30 bg-sky-500/[0.06] px-5 py-3 text-sm uppercase tracking-[0.2em] text-sky-200 transition-colors hover:border-sky-400/60 hover:bg-sky-500/[0.1]"
+          >
+            Deck
+          </a>
+          <a
             href="/dashboard"
             className="flex flex-1 items-center justify-center rounded-lg border border-zinc-700/70 bg-zinc-900/60 px-5 py-3 text-sm uppercase tracking-[0.2em] text-zinc-200 transition-colors hover:border-zinc-500 hover:bg-zinc-800/80"
           >
