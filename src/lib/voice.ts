@@ -27,6 +27,8 @@
 //   ELEVENLABS_AGENT_ID          ElevenLabs: Conversational-AI agent id
 //   ELEVENLABS_PHONE_NUMBER_ID   ElevenLabs: registered outbound phone_number_id
 
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { env } from "./env";
 
 if (typeof window !== "undefined") {
@@ -153,12 +155,19 @@ async function placeViaTwilio(to: string, script: string): Promise<PlaceCallResu
     return { ok: false, provider: "twilio", detail: "no creds" };
   }
 
-  // Inline TwiML: a measured, low-rate <Say> reading the monologue.
+  // Prefer a pre-rendered ElevenLabs opener (public/opener.mp3 — run
+  // `npx tsx scripts/gen-opener.ts`). If it exists AND Twilio can reach it (we
+  // have a public base URL), PLAY that cinematic audio; otherwise fall back to
+  // Twilio's Polly TTS reading the script live. Auto-detected, so no restart and
+  // no extra env var needed once the mp3 is generated.
+  const base = penv("PUBLIC_BASE_URL").replace(/\/+$/, "");
+  const haveAudio = base !== "" && existsSync(join(process.cwd(), "public", "opener.mp3"));
+  const inner = haveAudio
+    ? `<Play>${xmlEscape(`${base}/opener.mp3`)}</Play>`
+    : `<Say voice="Polly.Matthew-Neural" language="en-US">${xmlEscape(script)}</Say>`;
   const twiml =
     `<?xml version="1.0" encoding="UTF-8"?>` +
-    `<Response><Pause length="1"/>` +
-    `<Say voice="Polly.Matthew-Neural" language="en-US">${xmlEscape(script)}</Say>` +
-    `<Pause length="1"/></Response>`;
+    `<Response><Pause length="1"/>${inner}<Pause length="1"/></Response>`;
 
   const body = new URLSearchParams({ To: to, From: from, Twiml: twiml });
   const auth = Buffer.from(`${sid}:${token}`).toString("base64");
