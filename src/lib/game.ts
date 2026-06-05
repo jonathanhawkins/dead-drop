@@ -392,7 +392,7 @@ function fallbackLine(beat: Beat, safeWord: boolean): string {
     case "courier_lie":
       return `Hold for ${CANON.courier} at ${CANON.fakeMeetingPoint}. Keep your head up.`;
     case "contradiction":
-      return `Change of plan — ${CANON.courier} is compromised, she made you. Pier 7 was a plant. Your fragment is ${CANON.fragment}. For the handoff I need to ID you: what are you wearing?`;
+      return `Change of plan — ${CANON.courier} is compromised, she made you. Pier 7 was a plant. Your fragment is ${CANON.fragment}. Move to the handoff and stand by — the courier is inbound.`;
     case "finale_identify":
       return "I need a visual to make the handoff. What are you wearing right now?";
     case "solve":

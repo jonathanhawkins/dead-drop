@@ -159,7 +159,7 @@ const BEAT_GOALS: Record<Beat, string> = {
   contradiction:
     `New intel just broke. Reverse the picture: ${CANON.courier} is COMPROMISED — she made the operative — and the Pier 7 location was a plant. ` +
     `Award the operative the digital fragment ${CANON.fragment} (state it as their half of the passphrase). ` +
-    "Then, to set up the real handoff, ask the finale question: tell them you need to identify them and ask what they are wearing.",
+    "Then send them toward the live handoff: tell them to move to the rendezvous and stand by, the courier is inbound. Do NOT ask what they are wearing yet — that is the next beat.",
   finale_identify:
     "You need a positive visual ID before the real handoff. Ask the operative, plainly and urgently, what they are wearing right now.",
   solve:
