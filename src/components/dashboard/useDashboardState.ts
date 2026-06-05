@@ -98,8 +98,6 @@ const MAX_FACTS = 120;
 const MAX_MESSAGES = 60;
 const MAX_RECONCILES = 8;
 
-const SUPERSEDING_OPS: FactOp[] = ["supersede", "reconcile", "revise"];
-
 function normDirection(d: MessageRow["direction"]): TickerMessage["direction"] {
   if (d === "inbound" || d === "outbound") return d;
   return "system";
@@ -148,17 +146,24 @@ function reducer(state: DashboardState, action: Action): DashboardState {
       let facts = state.facts;
       let reconciliations = state.reconciliations;
 
-      // A superseding op strikes through earlier *current* facts in the same
-      // (subject, scope) partition. We don't strike the incoming row itself.
-      if (SUPERSEDING_OPS.includes(row.op)) {
-        facts = facts.map((f) =>
-          f.scope === incoming.scope &&
-          f.subject === incoming.subject &&
-          f.logId !== incoming.logId &&
-          !f.superseded
-            ? { ...f, superseded: true }
-            : f,
-        );
+      // A supersede/revise op identifies ONE specific contradicted fact — it
+      // carries that fact's content (and its fact_id when present). Strike ONLY
+      // that fact, NEVER the whole partition: other current beliefs (e.g. the
+      // Pier 7 lie) must stay bright — that lie-vs-truth gap is the whole point.
+      if (row.op === "supersede" || row.op === "revise") {
+        incoming.superseded = true; // this card represents the now-old belief
+        facts = facts.map((f) => {
+          if (f.logId === incoming.logId || f.superseded) return f;
+          if (f.scope !== incoming.scope || f.subject !== incoming.subject) return f;
+          const sameContent = f.content.trim() === incoming.content.trim();
+          const sameFact = incoming.factId != null && f.factId === incoming.factId;
+          return sameContent || sameFact ? { ...f, superseded: true } : f;
+        });
+      }
+
+      // The reconcile op is the NEW current belief — it strikes nothing, but it
+      // drives the headline banner (it carries the new content + before→after note).
+      if (row.op === "reconcile") {
         reconciliations = [
           {
             id: incoming.logId,
