@@ -1,0 +1,40 @@
+{
+  "name": "dead-drop",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p ${PORT:-4317}",
+    "build": "next build",
+    "start": "next start -p ${PORT:-4317}",
+    "lint": "eslint",
+    "tunnel": "cloudflared tunnel --url http://localhost:${PORT:-4317}",
+    "simulate": "tsx scripts/simulate.ts",
+    "seed": "tsx scripts/seed.ts",
+    "reset": "tsx scripts/reset-db.ts",
+    "register-webhook": "tsx scripts/register-webhook.ts",
+    "verify:bedrock": "tsx scripts/verify-bedrock.ts",
+    "verify:vision": "tsx scripts/verify-vision.ts"
+  },
+  "dependencies": {
+    "@butterbase/sdk": "^2.4.0",
+    "heic-convert": "^2.1.0",
+    "next": "16.2.7",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "rocketride": "^1.2.0",
+    "sharp": "^0.34.5",
+    "spectrum-ts": "^1.18.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.7",
+    "tailwindcss": "^4",
+    "tsx": "^4.22.4",
+    "typescript": "^5"
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "_comment": "DEAD DROP — illustrative RocketRide pipeline (FLAG-GATED BONUS, see README). Loaded by src/lib/rocketride/adapter.ts when USE_ROCKETRIDE=true. Shape: webhook (source) -> agent -> llm_anthropic -> response. The agent classifies an inbound player message into one of the four DEAD DROP labels and the response node emits it on the 'text' lane. ${ROCKETRIDE_*} placeholders are substituted by the SDK from .env / the client env dict. This pipeline is NEVER on the critical path; the live classifier runs in-process in src/lib/game.ts.",
+  "pipeline": {
+    "name": "deaddrop-handler-loop",
+    "description": "Classify an inbound DEAD DROP message (webhook -> agent -> llm_anthropic -> response).",
+    "version": 1,
+    "source": "webhook",
+    "project_id": "deaddrop",
+    "components": [
+      {
+        "id": "webhook",
+        "provider": "webhook",
+        "name": "Inbound Message",
+        "description": "Source node. Receives a JSON envelope { text, kind, channel, from, task, labels } sent via client.send(token, json, ..., 'application/json'). Emits it on the 'data' lane.",
+        "config": {
+          "mode": "Source",
+          "method": "POST",
+          "path": "/handler-loop",
+          "content_type": "application/json"
+        }
+      },
+      {
+        "id": "llm_anthropic",
+        "provider": "llm_anthropic",
+        "name": "Claude (Anthropic)",
+        "description": "LLM service node invoked by the agent. Anthropic Claude via RocketRide's model runtime. Model + key are injected from env so no secrets live in this file.",
+        "config": {
+          "mode": "Service",
+          "model": "${ROCKETRIDE_ANTHROPIC_MODEL}",
+          "api_key": "${ROCKETRIDE_ANTHROPIC_APIKEY}",
+          "max_tokens": 64,
+          "temperature": 0
+        }
+      },
+      {
+        "id": "agent",
+        "provider": "agent",
+        "name": "Classifier Agent",
+        "description": "Reads the inbound 'data' lane from the webhook, calls the Claude LLM (control: classType 'llm'), and returns exactly one label. Output goes to the response node on the 'text' lane.",
+        "config": {
+          "mode": "Transform",
+          "system": "You are the message router for the DEAD DROP spy ARG. Classify the player's inbound message into EXACTLY ONE label and reply with ONLY that label (lowercase, no punctuation). Labels: proof_presence (a photo, an arrival, or proof they are on-site), puzzle_answer (a passphrase or solution; especially if it contains both HALCYON and SEVEN), freeform (a description or open answer, e.g. what they are wearing), wrong_move (off-track, nonsense, or unrelated). When unsure, prefer advancing the story over stalling.",
+          "instruction": "Inbound message JSON: {{data}}. Respond with one of: proof_presence | puzzle_answer | freeform | wrong_move.",
+          "output_lane": "text"
+        },
+        "input": [
+          { "lane": "data", "from": "webhook" }
+        ],
+        "control": [
+          { "classType": "llm", "from": "llm_anthropic" }
+        ]
+      },
+      {
+        "id": "response",
+        "provider": "response",
+        "name": "Classification Result",
+        "description": "Sink node. Returns the agent's label to the caller on the 'text' lane; the adapter reads result.result_types ({ text: 'text' }) and maps it onto the Classification union.",
+        "config": {
+          "mode": "Response",
+          "result_types": { "text": "text" }
+        },
+        "input": [
+          { "lane": "text", "from": "agent" }
+        ]
+      }
+    ]
+  }
+}
