@@ -64,10 +64,34 @@ export interface DashboardState {
   game: GameState | null;
 }
 
+// The cold-start snapshot the dashboard fetches on mount (GET /api/dashboard/
+// snapshot). Facts arrive as raw `facts` rows (newest first); messages as loose
+// rows. We fold them in under the realtime stream so the columns aren't empty on
+// open, then realtime overlays live updates on top (deduped by id).
+interface SnapshotFactRow {
+  id: string;
+  scope: Scope;
+  subject: string;
+  content?: string | null;
+  status?: string | null;
+  created_at?: string | null;
+}
+
+export interface DashboardSnapshot {
+  game?: GameState | null;
+  facts?: {
+    world?: SnapshotFactRow[];
+    handlerSecret?: SnapshotFactRow[];
+    player?: SnapshotFactRow[];
+  } | null;
+  messages?: MessageRow[] | null;
+}
+
 type Action =
   | { kind: "fact"; row: FactLogRow }
   | { kind: "message"; row: MessageRow }
   | { kind: "game"; row: GameState }
+  | { kind: "snapshot"; snapshot: DashboardSnapshot }
   | { kind: "unfresh"; logId: string };
 
 const MAX_FACTS = 120;
@@ -109,6 +133,17 @@ function reducer(state: DashboardState, action: Action): DashboardState {
 
       // Dedupe — realtime can replay; never show the same log row twice.
       if (state.facts.some((f) => f.logId === incoming.logId)) return state;
+      // Also dedupe against the cold-start snapshot: a seeded fact is keyed by its
+      // facts.id, while its later realtime `assert` echo carries the same id in
+      // `fact_id`. Suppress only the assert echo — supersede/reconcile/revise must
+      // still pass through so they can strike the seeded card.
+      if (
+        row.op === "assert" &&
+        incoming.factId &&
+        state.facts.some((f) => f.factId === incoming.factId)
+      ) {
+        return state;
+      }
 
       let facts = state.facts;
       let reconciliations = state.reconciliations;
@@ -169,6 +204,80 @@ function reducer(state: DashboardState, action: Action): DashboardState {
       return { ...state, game: row };
     }
 
+    case "snapshot": {
+      const snap = action.snapshot;
+
+      // ---- facts ----
+      // Flatten the three scoped buckets into seeded DashboardFacts. Each is keyed
+      // by its facts.id (logId === factId) so the realtime assert echo dedupes
+      // against it. Pre-existing intel is NOT flashed (fresh:false). The snapshot
+      // returns only `current` facts; mark anything else superseded defensively.
+      const buckets: SnapshotFactRow[] = [
+        ...(snap.facts?.world ?? []),
+        ...(snap.facts?.handlerSecret ?? []),
+        ...(snap.facts?.player ?? []),
+      ];
+      const seen = new Set(state.facts.map((f) => f.logId));
+      const seenFactIds = new Set(
+        state.facts.map((f) => f.factId).filter((x): x is string => Boolean(x)),
+      );
+      const seeded: DashboardFact[] = [];
+      for (const r of buckets) {
+        if (!r || !r.id) continue;
+        if (seen.has(r.id) || seenFactIds.has(r.id)) continue; // already have it
+        seen.add(r.id);
+        seenFactIds.add(r.id);
+        seeded.push({
+          logId: r.id,
+          factId: r.id,
+          scope: r.scope,
+          subject: r.subject,
+          content: r.content ?? "",
+          op: "assert",
+          note: null,
+          createdAt: r.created_at ?? new Date().toISOString(),
+          superseded: r.status != null && r.status !== "current",
+          fresh: false,
+        });
+      }
+      // Keep newest-first ordering consistent with the realtime path.
+      const facts =
+        seeded.length > 0
+          ? [...state.facts, ...seeded]
+              .sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0))
+              .slice(0, MAX_FACTS)
+          : state.facts;
+
+      // ---- messages ----
+      const haveMsg = new Set(state.messages.map((m) => m.id));
+      const seededMsgs: TickerMessage[] = [];
+      for (const row of snap.messages ?? []) {
+        if (!row || !row.id || haveMsg.has(row.id)) continue;
+        haveMsg.add(row.id);
+        seededMsgs.push({
+          id: row.id,
+          direction: normDirection(row.direction),
+          body: bodyOf(row),
+          channel: row.channel ?? null,
+          contentType: row.content_type ?? null,
+          createdAt: row.created_at ?? new Date().toISOString(),
+        });
+      }
+      const messages =
+        seededMsgs.length > 0
+          ? [...state.messages, ...seededMsgs]
+              .sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0))
+              .slice(0, MAX_MESSAGES)
+          : state.messages;
+
+      // ---- game ----
+      // Only seed game_state if realtime hasn't already provided one (realtime is
+      // authoritative; the snapshot just fills the cold-start gap).
+      const game = state.game ?? snap.game ?? null;
+
+      return { ...state, facts, messages, game };
+    }
+
     case "unfresh": {
       let changed = false;
       const facts = state.facts.map((f) => {
@@ -224,6 +333,29 @@ export function useDashboardState(initial?: Partial<DashboardState>): UseDashboa
     return () => {
       client.close();
       clientRef.current = null;
+    };
+  }, []);
+
+  // Cold-start hydration: pull the existing mission state once on mount so the
+  // columns render immediately instead of waiting for the next realtime event.
+  // The reducer folds this UNDER the live stream and dedupes by id, so a fact
+  // present in both the snapshot and a later `change` won't render twice. The
+  // browser calls our server route (which holds the service key) — no secret
+  // touches the client. Failures are silent: realtime still drives the view.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/dashboard/snapshot", { cache: "no-store" });
+        if (!res.ok) return;
+        const snapshot = (await res.json()) as DashboardSnapshot;
+        if (!cancelled) dispatch({ kind: "snapshot", snapshot });
+      } catch {
+        /* offline / route not up yet — realtime carries the show */
+      }
+    })();
+    return () => {
+      cancelled = true;
     };
   }, []);
 

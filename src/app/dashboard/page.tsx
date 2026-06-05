@@ -10,7 +10,7 @@
 // Everything is driven by the Butterbase realtime feed via useDashboardState.
 // Client-only; reads NEXT_PUBLIC_* env exclusively. No server imports.
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import type { Beat } from "@/lib/types";
 import { BEAT_ORDER } from "@/lib/types";
 import {
@@ -79,28 +79,11 @@ export default function DashboardPage() {
     return () => window.clearInterval(id);
   }, []);
 
-  // Best-effort: when we learn a sessionId, hydrate from /api/status so the
-  // columns aren't empty if the operator opens the dashboard mid-mission.
-  // Realtime then keeps it live. Failures are silent (realtime still works).
-  const hydratedFor = useRef<string>("");
-  const seedFromStatus = useCallback(async (sid: string) => {
-    if (!sid || hydratedFor.current === sid) return;
-    hydratedFor.current = sid;
-    try {
-      const res = await fetch(`/api/status?sessionId=${encodeURIComponent(sid)}`, { cache: "no-store" });
-      if (!res.ok) return;
-      // We intentionally don't merge historical facts into the realtime reducer
-      // here (it keys off fact_log ids we don't have from /status); this call
-      // simply confirms the session is reachable. Realtime carries the show.
-      await res.json().catch(() => null);
-    } catch {
-      /* offline / route not up yet — realtime still drives the view */
-    }
-  }, []);
-
-  useEffect(() => {
-    if (sessionId) void seedFromStatus(sessionId);
-  }, [sessionId, seedFromStatus]);
+  // Cold-start hydration is handled inside useDashboardState: it fetches
+  // /api/dashboard/snapshot on mount and folds the existing world / handler-secret
+  // / player facts, recent messages, and game_state in UNDER the realtime stream
+  // (deduped by id), so the columns render immediately instead of waiting for the
+  // next live event. Realtime then keeps everything updating in place.
 
   const beat = game?.beat ?? null;
 
