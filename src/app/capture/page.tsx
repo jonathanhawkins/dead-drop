@@ -15,7 +15,7 @@
 // Every network call is wrapped; any failure drops us into a clear error with a
 // retry, never a stuck spinner. Client component: reads NEXT_PUBLIC_* only.
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type Stage = "idle" | "locating" | "located" | "uploading" | "confirming" | "done" | "error";
 
@@ -66,7 +66,7 @@ function geoErrorMessage(code: number): string {
 
 export default function CapturePage() {
   const [stage, setStage] = useState<Stage>("idle");
-  const [phone, setPhone] = useState<string>(loadStoredPhone);
+  const [phone, setPhone] = useState<string>("");
   const [gps, setGps] = useState<Gps | null>(null);
   const [photo, setPhoto] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
@@ -74,11 +74,21 @@ export default function CapturePage() {
   const [handlerReply, setHandlerReply] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const secureContext =
-    typeof window === "undefined"
-      ? true
-      : window.isSecureContext || window.location.hostname === "localhost";
-  const geoSupported = typeof navigator !== "undefined" && "geolocation" in navigator;
+  // Browser-only values must match the server on the FIRST render, then correct
+  // after mount — otherwise React throws a hydration mismatch. `mounted` is false
+  // on the server + first client render, true thereafter.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+    const stored = loadStoredPhone();
+    if (stored) setPhone(stored);
+  }, []);
+
+  const secureContext = !mounted
+    ? true
+    : window.isSecureContext || window.location.hostname === "localhost";
+  const geoSupported =
+    !mounted || (typeof navigator !== "undefined" && "geolocation" in navigator);
 
   const phoneValid = useMemo(() => {
     const digits = phone.replace(/[^\d]/g, "");
