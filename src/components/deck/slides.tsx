@@ -603,6 +603,13 @@ function FinaleSlide() {
         </WhyCard>
       </div>
 
+      <p className="mx-auto mt-7 max-w-2xl text-sm leading-relaxed text-white/65 sm:text-base">
+        <span style={{ color: COLOR.green }}>And it scales.</span> That stranger can
+        be hired, not planted — <b className="text-white">RentAHuman</b> posts the
+        handoff as a $5 bounty and a real courier shows up. One teammate today; any
+        city, on demand, tomorrow.
+      </p>
+
       <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
         <LinkChip href="/dashboard" accent={COLOR.sky}>
           /dashboard
