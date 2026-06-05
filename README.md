@@ -23,7 +23,9 @@ The whole thing runs locally with mocks (no phone, no credits) via
 ## The four mandatory tools (and exactly how each is used)
 
 DEAD DROP is built on four sponsor tools. Here is precisely where each one lives
-in this codebase.
+in this codebase. (A fifth integration, **RentAHuman**, recruits the real-world
+field actor for the finale — see
+[Recruiting the field actor](#recruiting-the-field-actor-rentahuman) below.)
 
 ### 1. Butterbase — backend, AI gateway, realtime, and storage
 
@@ -106,6 +108,52 @@ timeouts), so the loop transparently falls back to the in-process classifier.
 
 ---
 
+## Recruiting the field actor (RentAHuman)
+
+The finale "steps out of the phone" when a real person hands the player the
+`SEVEN` envelope. On stage that person is a **planted teammate** (the safe
+default). **RentAHuman** is the "how it scales" beat: instead of a teammate, you
+post a bounty and an actual stranger on-site accepts it, receives the envelope,
+and is pointed at the player in real time by their live "what are you wearing?"
+description. Everyone in the scene still knows it's a game (per the craft rules).
+
+`src/lib/rentahuman.ts` is **server-only** (it holds the API key) and wraps
+`POST https://rentahuman.ai/api/bounties`, authed with header
+`X-API-Key: rah_...`.
+
+How the money works:
+
+- **Posting a bounty is FREE.** `createBounty()` publishes an open listing and
+  charges nothing.
+- **The price is only escrowed when you accept an applicant** (default **$5**).
+  So you can post the courier listing live with zero cost and only pay once you
+  hire the stranger who shows up.
+- A **`dryRun`** flag previews the exact payload with **no side effects** — no
+  listing created, no charge.
+
+Lib exports:
+
+- `createBounty(input)` — create (or, with `dryRun:true`, preview) a bounty.
+  Never throws; returns `{ ok, dryRun, bounty?, error? }`.
+- `getBounty(id)` — fetch a bounty's status.
+- `listApplications(id)` — list the humans who applied.
+- `handoffBounty({ price?, venue?, deadline? })` — the canonical DEAD DROP finale
+  courier bounty (hand off a sealed envelope in ~5 min, identified by what the
+  player is wearing).
+
+Two commands (env var: `RENTAHUMAN_API_KEY=rah_...`, optional
+`RENTAHUMAN_API_BASE`):
+
+```bash
+npx tsx scripts/post-handoff.ts                 # DRY RUN — preview only, nothing posted, no charge
+LIVE=true npx tsx scripts/post-handoff.ts       # actually publish the bounty (still $0 until you accept someone)
+PRICE=5 VENUE="Agentic AI SF Hackathon" LIVE=true npx tsx scripts/post-handoff.ts   # overrides
+```
+
+See [`docs/RENTAHUMAN.md`](docs/RENTAHUMAN.md) for the full walk-through.
+
+---
+
 ## How it fits together (one turn)
 
 ```
@@ -173,6 +221,7 @@ Then fill it in. The variables that matter:
 | `NEXT_PUBLIC_OVERRIDE_TOKEN` | Mirror of the above; pre-fills the dashboard's token field. Keep the two equal. |
 | `VOICE_PROVIDER` | `mock` (default) / `twilio` / `vapi` / `elevenlabs` for the opening call. |
 | `USE_ROCKETRIDE` | `false` (default). `true` enables the bonus RocketRide classifier. |
+| `RENTAHUMAN_API_KEY` | `rah_...` key for posting the finale courier bounty (server-only). Optional `RENTAHUMAN_API_BASE`. Only needed for the live RentAHuman option. |
 
 > The demo runs end-to-end with **`MOCK_AI=true MOCK_PHOTON=true`** and only the
 > Butterbase keys set. Everything else is needed only for the live phone demo.
@@ -279,6 +328,7 @@ src/lib/
   voice.ts            cinematic opening call (mock / twilio / vapi / elevenlabs)
   realtime-client.ts  browser WS client for the dashboard
   rocketride/adapter.ts   flag-gated RocketRide classifier (bonus)
+  rentahuman.ts       RentAHuman bounty API: recruit the finale courier (server-only)
 src/app/
   page.tsx            landing index (Handler number + links)
   dashboard/page.tsx  mission control (projector)
@@ -289,7 +339,7 @@ src/app/
   api/status          session snapshot for the dashboard
   api/capture[/upload-url]   capture-page proof + presigned upload URL
 pipelines/handler-loop.pipe  illustrative RocketRide pipeline (bonus)
-scripts/              simulate · seed · register-webhook · reset · verify:bedrock
+scripts/              simulate · seed · register-webhook · reset · verify:bedrock · post-handoff (RentAHuman)
 ```
 
 Safe word: text **`ABORT`** at any time and the Handler ends the mission kindly.

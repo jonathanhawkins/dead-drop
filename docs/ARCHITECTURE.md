@@ -203,7 +203,8 @@ if the operator opens the dashboard mid-mission; realtime then carries the show.
 
 - **Server-only** (hold secrets, never imported into a client component):
   `env`, `butterbase`, `ai`, `photon`, `memory`, `game`, `content`, `loop`,
-  `voice`, `rocketride/adapter`. Each guards with a `typeof window` check.
+  `voice`, `rocketride/adapter`, `rentahuman`. Each guards with a `typeof window`
+  check.
 - **Client**: the dashboard, capture page, landing page, and `realtime-client`
   read `NEXT_PUBLIC_*` only.
 - **API routes** export `runtime = "nodejs"` and `dynamic = "force-dynamic"`.
@@ -215,7 +216,24 @@ if the operator opens the dashboard mid-mission; realtime then carries the show.
 
 ---
 
-## 5. Data model (Butterbase tables)
+## 5. Recruiting the finale courier (RentAHuman)
+
+The handoff actor is normally a planted teammate. **RentAHuman**
+(`src/lib/rentahuman.ts`, server-only — holds the `RENTAHUMAN_API_KEY`) is the
+optional "how it scales" path: it posts a bounty to
+`POST https://rentahuman.ai/api/bounties` (`X-API-Key: rah_...`) so a real
+stranger on-site can accept, take the envelope, and be pointed at the player by
+their live `wearing` description. It sits entirely **outside the message loop** —
+recruitment happens once at the finale, driven from a script
+(`scripts/post-handoff.ts`), not from `handleInbound`. Economics: **posting is
+free** (`createBounty`), and the price (default $5) is **escrowed only on
+accept**, with a `dryRun` flag to preview the payload with no side effects.
+Exports: `createBounty`, `getBounty`, `listApplications`, and the canonical
+`handoffBounty()`.
+
+---
+
+## 6. Data model (Butterbase tables)
 
 ```
 players(id, phone UNIQUE, handle, created_at)

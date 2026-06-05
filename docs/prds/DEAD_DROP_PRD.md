@@ -227,6 +227,7 @@ The failure mode is building four cool fragments that do not connect by demo tim
 - Multiple cities.
 - A web-search or Yelp clue engine that adapts to nearby venues. If we want any dynamic content, web search is the safer route, and even then keep it off the critical path. Do not scrape Yelp live: flaky and against their terms.
 - rentahuman.ai for the live actor. The demo actor is a planted teammate. rentahuman is the how-it-scales story.
+  - **NOTE: now implemented — see `src/lib/rentahuman.ts` (and `scripts/post-handoff.ts`). Supersedes "do not build": posting the finale courier bounty is built; the planted teammate remains the safe default.**
 - Full multi-episode campaign. We build one episode arc.
 - Payments and subscriptions. Butterbase supports Stripe Connect, but mock it in test mode if shown at all.
 - Native iOS or Android. We are deliberately not building this. Photon plus a web capture page is the design.

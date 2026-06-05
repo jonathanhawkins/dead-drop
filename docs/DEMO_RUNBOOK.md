@@ -17,7 +17,11 @@ Target run time: ~4–6 minutes.
 - **Player** — a volunteer with an iPhone (or any phone for WhatsApp). Texts the
   Handler line.
 - **Actor / courier** — stands to the side with a small envelope. Inside (or
-  written on it): **`SEVEN`**.
+  written on it): **`SEVEN`**. **Default: a planted teammate** (rehearsed, the
+  safe choice). **Live/scale option:** recruit a real stranger on-site via
+  **RentAHuman** (see "The handoff" beat below) so the courier is someone the
+  player has never met — the "how it scales" beat. Everyone in the scene still
+  knows it's a game.
 - **The drop site** — the **sponsor banner** in the room (RocketRide /
   Butterbase). That's what the player photographs.
 - **The canon** (operator should know it cold):
@@ -55,6 +59,17 @@ Target run time: ~4–6 minutes.
    end with zero spend.
 6. **Brief the actor:** when the **WEARING** panel lights up green with a
    description, read it, walk to that person, hand them the envelope, say nothing.
+7. **(Optional) Recruit a real courier via RentAHuman.** To run the live/scale
+   option instead of the planted teammate, preview the bounty first, then publish:
+   ```bash
+   npx tsx scripts/post-handoff.ts                                 # DRY RUN — preview, free, nothing posted
+   PRICE=5 VENUE="Agentic AI SF Hackathon" LIVE=true npx tsx scripts/post-handoff.ts   # publish (still $0 until you accept)
+   ```
+   Needs `RENTAHUMAN_API_KEY=rah_...` set. Posting is **free**; the $5 is escrowed
+   **only when you accept** an applicant. When someone on-site applies, accept
+   them, hand them the envelope, and brief them exactly like the actor above
+   (read the WEARING panel, walk up, hand it over). **If anything is uncertain,
+   fall back to the planted teammate — that's always the safe default.**
 
 ---
 
@@ -120,9 +135,17 @@ operator's safety net.
 ### Beat 4 — The handoff steps out of the phone → HANDOFF
 
 - **Handler replies:** *"Hold position. My courier is moving to you."*
-- **Actor:** reads the WEARING panel, walks across the room to that person, and
+- **Courier:** reads the WEARING panel, walks across the room to that person, and
   **hands them the envelope (`SEVEN`)** in silence. This is the gasp moment — the
   game just left the screen.
+  - **Default — planted teammate** (rehearsed, reliable).
+  - **Live/scale option — RentAHuman stranger:** if you posted and accepted a
+    bounty in pre-flight step 7, the courier is a real person who has never met
+    the player. Same move: they read the player's live `wearing` description off
+    the WEARING panel and walk it over. This is the literal "how it scales" beat —
+    the planted teammate becomes a stranger hired on demand. **If the bounty
+    didn't fill or anything's shaky, the planted teammate covers it — always the
+    safe default.**
 - **Handler** (already sent): tells the player to **combine their fragment with
   whatever the courier hands them** (it never says `SEVEN` or the full passphrase
   itself).
@@ -151,6 +174,7 @@ operator's safety net.
 | AI prose feels flat / saving credits | `MOCK_AI=true` — canned but coherent Handler lines; arc still advances. |
 | Opening call fails / no telephony | `VOICE_PROVIDER=mock` logs the script; the text mission proceeds regardless. |
 | Player wants out | They text **`ABORT`** — the Handler stands them down warmly and ends the mission. |
+| RentAHuman bounty didn't fill / courier no-show | Use the **planted teammate** for the handoff — always the safe default. (Posting was free; you only pay on accept.) |
 | Dashboard columns empty mid-show | Paste the **session id** into the control bar's session field; realtime + `/api/status` rehydrate. |
 | Realtime dot not green | Check `NEXT_PUBLIC_BUTTERBASE_*` (app id + realtime token); the client auto-reconnects with backoff. |
 
@@ -179,7 +203,8 @@ Player replies ──▶ CONTRADICTION  (clean→compromised reconciled live; fr
       ▼
 "What are you wearing?" ──▶ IDENTIFY ──▶ WEARING blown up on the projector
       ▼
-Actor reads it, walks up, hands over the envelope (SEVEN) ──▶ HANDOFF
+Courier (planted teammate, or a RentAHuman stranger) reads it, walks up,
+        hands over the envelope (SEVEN) ──▶ HANDOFF
       ▼
 Player texts HALCYON SEVEN ──▶ SIGNED OFF
 ```
