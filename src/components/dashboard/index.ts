@@ -16,3 +16,4 @@ export { MessageTicker } from "./MessageTicker";
 export { ControlBar } from "./ControlBar";
 export { ReconcileBanner } from "./ReconcileBanner";
 export { CourierPanel } from "./CourierPanel";
+export { PanelToggle } from "./PanelToggle";

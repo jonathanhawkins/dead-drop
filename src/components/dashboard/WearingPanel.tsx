@@ -7,6 +7,7 @@
 
 import type { CSSProperties } from "react";
 import type { Beat, GameState } from "@/lib/types";
+import { PanelToggle } from "./PanelToggle";
 
 const BEAT_LABEL: Record<Beat, string> = {
   intro: "INTRO · awaiting contact",
@@ -23,9 +24,13 @@ const ACTION_BEATS: Beat[] = ["finale_identify", "solve"];
 
 export interface WearingPanelProps {
   game: GameState | null;
+  /** When true, only the header is shown. */
+  collapsed?: boolean;
+  /** Toggle collapsed/expanded. */
+  onToggleCollapse?: () => void;
 }
 
-export function WearingPanel({ game }: WearingPanelProps) {
+export function WearingPanel({ game, collapsed = false, onToggleCollapse }: WearingPanelProps) {
   const wearing = game?.wearing?.trim() || "";
   const beat = game?.beat;
   const fragment = game?.digital_fragment?.trim() || "";
@@ -43,18 +48,25 @@ export function WearingPanel({ game }: WearingPanelProps) {
   };
 
   return (
-    <section className="rounded-lg p-4 sm:p-6 flex flex-col" style={wrapStyle} aria-label="Field actor — operative identification">
-      <div className="flex items-center justify-between mb-2">
+    <section className={`rounded-lg flex flex-col ${collapsed ? "p-3" : "p-4 sm:p-6"}`} style={wrapStyle} aria-label="Field actor — operative identification">
+      <div className={`flex items-center justify-between ${collapsed ? "" : "mb-2"}`}>
         <h2 className="text-[11px] sm:text-xs font-black tracking-[0.3em] uppercase" style={{ color: accent }}>
           ▣ Field Actor · Identify the Operative
         </h2>
-        {beat ? (
-          <span className="text-[10px] sm:text-[11px] font-mono uppercase tracking-[0.16em] text-white/40">
-            {BEAT_LABEL[beat]}
-          </span>
-        ) : null}
+        <div className="flex items-center gap-2">
+          {beat ? (
+            <span className="text-[10px] sm:text-[11px] font-mono uppercase tracking-[0.16em] text-white/40">
+              {collapsed && live ? wearing.toUpperCase() : BEAT_LABEL[beat]}
+            </span>
+          ) : null}
+          {onToggleCollapse ? (
+            <PanelToggle collapsed={collapsed} onToggle={onToggleCollapse} accent={accent} label="Field Actor" />
+          ) : null}
+        </div>
       </div>
 
+      {collapsed ? null : (
+      <>
       <div className="flex-1 flex flex-col items-center justify-center text-center py-4 min-h-[120px]">
         {live ? (
           <>
@@ -99,6 +111,8 @@ export function WearingPanel({ game }: WearingPanelProps) {
             </span>
           ) : null}
         </div>
+      )}
+      </>
       )}
     </section>
   );

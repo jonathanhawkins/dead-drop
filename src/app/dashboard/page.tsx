@@ -10,7 +10,7 @@
 // Everything is driven by the Butterbase realtime feed via useDashboardState.
 // Client-only; reads NEXT_PUBLIC_* env exclusively. No server imports.
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { Beat } from "@/lib/types";
 import { BEAT_ORDER } from "@/lib/types";
 import {
@@ -64,11 +64,41 @@ function BeatRail({ beat }: { beat: Beat | null }) {
   );
 }
 
+type PanelKey = "actor" | "courier" | "wire";
+
 export default function DashboardPage() {
   const state = useDashboardState();
   const { factsByScope, scopedMessages, reconciliations, game, status } = state;
   const [pinnedSession, setPinnedSession] = useState<string>("");
   const sessionId = pinnedSession || game?.session_id || "";
+
+  // Collapse state for the right-rail panels so the operator can fit everything
+  // on the projector. Persisted to localStorage; loaded after mount to avoid
+  // hydration drift on the static prerender.
+  const [collapsed, setCollapsed] = useState<Record<PanelKey, boolean>>({
+    actor: false,
+    courier: false,
+    wire: false,
+  });
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem("dd:panels");
+      if (raw) setCollapsed((c) => ({ ...c, ...JSON.parse(raw) }));
+    } catch {
+      /* no-op */
+    }
+  }, []);
+  const togglePanel = useCallback((key: PanelKey) => {
+    setCollapsed((c) => {
+      const next = { ...c, [key]: !c[key] };
+      try {
+        window.localStorage.setItem("dd:panels", JSON.stringify(next));
+      } catch {
+        /* no-op */
+      }
+      return next;
+    });
+  }, []);
 
   // Live clock for the cinematic header (mounts client-side; avoids hydration drift).
   const [clock, setClock] = useState<string>("");
@@ -146,15 +176,31 @@ export default function DashboardPage() {
         <FactColumn scope="player" facts={factsByScope.player} />
         <FactColumn scope="handler-secret" facts={factsByScope["handler-secret"]} />
 
-        {/* Right rail: WEARING (huge) over the FIELD COURIER card and the live wire. */}
+        {/* Right rail: WEARING (huge) over the FIELD COURIER card and the live wire.
+            Each panel collapses so the operator can fit everything; the LIVE WIRE
+            grows to fill whatever space the others give up. */}
         <div className="flex flex-col gap-3 min-h-0">
-          <WearingPanel game={game} />
+          <div className="shrink-0">
+            <WearingPanel
+              game={game}
+              collapsed={collapsed.actor}
+              onToggleCollapse={() => togglePanel("actor")}
+            />
+          </div>
           {/* "How it scales": the real-human courier bounty + live applicants. */}
           <div className="shrink-0">
-            <CourierPanel />
+            <CourierPanel
+              collapsed={collapsed.courier}
+              onToggleCollapse={() => togglePanel("courier")}
+            />
           </div>
-          <div className="flex-1 min-h-0">
-            <MessageTicker messages={scopedMessages} composing={handlerComposing} />
+          <div className={collapsed.wire ? "shrink-0" : "flex-1 min-h-0"}>
+            <MessageTicker
+              messages={scopedMessages}
+              composing={handlerComposing}
+              collapsed={collapsed.wire}
+              onToggleCollapse={() => togglePanel("wire")}
+            />
           </div>
         </div>
       </div>

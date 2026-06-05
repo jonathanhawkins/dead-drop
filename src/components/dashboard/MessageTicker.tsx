@@ -6,6 +6,7 @@
 
 import type { CSSProperties } from "react";
 import type { TickerMessage } from "./useDashboardState";
+import { PanelToggle } from "./PanelToggle";
 
 function timeOf(iso: string): string {
   const d = new Date(iso);
@@ -121,9 +122,13 @@ export interface MessageTickerProps {
   /** When true, render a subtle animated "HANDLER · composing…" bubble at the
    * top of the wire to mask the Handler's ~10s reply latency. */
   composing?: boolean;
+  /** When true, only the header is shown. */
+  collapsed?: boolean;
+  /** Toggle collapsed/expanded. */
+  onToggleCollapse?: () => void;
 }
 
-export function MessageTicker({ messages, composing = false }: MessageTickerProps) {
+export function MessageTicker({ messages, composing = false, collapsed = false, onToggleCollapse }: MessageTickerProps) {
   return (
     <section
       className="flex flex-col min-h-0 rounded-lg overflow-hidden"
@@ -132,16 +137,23 @@ export function MessageTicker({ messages, composing = false }: MessageTickerProp
     >
       <header className="px-3 py-2 flex items-center justify-between" style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
         <h2 className="text-sm font-black tracking-[0.22em] text-white/80">◉ LIVE WIRE</h2>
-        <span className="text-[10px] uppercase tracking-[0.14em] text-white/35 font-mono">{messages.length} msgs</span>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] uppercase tracking-[0.14em] text-white/35 font-mono">{messages.length} msgs</span>
+          {onToggleCollapse ? (
+            <PanelToggle collapsed={collapsed} onToggle={onToggleCollapse} accent="rgba(255,255,255,0.6)" label="Live Wire" />
+          ) : null}
+        </div>
       </header>
-      <ul className="flex-1 min-h-0 overflow-y-auto p-3 flex flex-col gap-2.5">
-        {composing ? <ComposingBubble /> : null}
-        {messages.length === 0 && !composing ? (
-          <li className="text-[12px] text-white/25 font-mono px-1 py-6 text-center">no traffic yet…</li>
-        ) : (
-          messages.map((m) => <Bubble key={m.id} msg={m} />)
-        )}
-      </ul>
+      {collapsed ? null : (
+        <ul className="flex-1 min-h-0 overflow-y-auto p-3 flex flex-col gap-2.5">
+          {composing ? <ComposingBubble /> : null}
+          {messages.length === 0 && !composing ? (
+            <li className="text-[12px] text-white/25 font-mono px-1 py-6 text-center">no traffic yet…</li>
+          ) : (
+            messages.map((m) => <Bubble key={m.id} msg={m} />)
+          )}
+        </ul>
+      )}
     </section>
   );
 }

@@ -17,6 +17,7 @@
 // through our server routes.
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { PanelToggle } from "./PanelToggle";
 
 const ACCENT = "#a78bfa"; // violet — distinct from world/player/handler scopes
 const GLOW = "rgba(167,139,250,0.16)";
@@ -73,7 +74,14 @@ function timeOf(iso: string | null): string {
   return d.toLocaleTimeString([], { hour12: false, hour: "2-digit", minute: "2-digit" });
 }
 
-export function CourierPanel() {
+export interface CourierPanelProps {
+  /** When true, only the header (with live status) is shown. */
+  collapsed?: boolean;
+  /** Toggle collapsed/expanded. */
+  onToggleCollapse?: () => void;
+}
+
+export function CourierPanel({ collapsed = false, onToggleCollapse }: CourierPanelProps = {}) {
   const [data, setData] = useState<CourierStatus | null>(null);
   const [dryRun, setDryRun] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -166,20 +174,25 @@ export function CourierPanel() {
             recruit a real human to hand off the envelope
           </p>
         </div>
-        {bounty ? (
-          <span
-            className="text-[10px] font-mono uppercase tracking-[0.14em] px-2 py-0.5 rounded"
-            style={{ color: statusColor(bounty.status), border: `1px solid ${statusColor(bounty.status)}66` }}
-            title="bounty status"
-          >
-            {bounty.status}
-          </span>
-        ) : (
-          <span className="text-[10px] font-mono uppercase tracking-[0.14em] text-white/30">no listing</span>
-        )}
+        <div className="flex items-center gap-2">
+          {bounty ? (
+            <span
+              className="text-[10px] font-mono uppercase tracking-[0.14em] px-2 py-0.5 rounded"
+              style={{ color: statusColor(bounty.status), border: `1px solid ${statusColor(bounty.status)}66` }}
+              title="bounty status"
+            >
+              {bounty.status}
+            </span>
+          ) : (
+            <span className="text-[10px] font-mono uppercase tracking-[0.14em] text-white/30">no listing</span>
+          )}
+          {onToggleCollapse ? (
+            <PanelToggle collapsed={collapsed} onToggle={onToggleCollapse} accent={ACCENT} label="Field Courier" />
+          ) : null}
+        </div>
       </div>
 
-      {bounty ? (
+      {collapsed ? null : bounty ? (
         // ── LIVE LISTING ─────────────────────────────────────────────
         <>
           <div className="flex items-start justify-between gap-3">
