@@ -131,7 +131,7 @@ export interface MessageTickerProps {
 export function MessageTicker({ messages, composing = false, collapsed = false, onToggleCollapse }: MessageTickerProps) {
   return (
     <section
-      className="flex flex-col min-h-0 rounded-lg overflow-hidden"
+      className="flex h-full flex-col min-h-0 rounded-lg overflow-hidden"
       style={{ background: "rgba(8,10,14,0.72)", border: "1px solid rgba(255,255,255,0.08)" }}
       aria-label="Live message wire"
     >
