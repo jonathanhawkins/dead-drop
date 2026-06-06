@@ -81,16 +81,25 @@ export default function DeckPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [next, prev, go]);
 
-  // ── Touch / swipe (laptop trackpads + touch projectors) ────────────────
-  const touchX = useRef<number | null>(null);
+  // ── Touch / swipe (phones, laptop trackpads, touch projectors) ─────────
+  // Track both axes so a horizontal flick changes slides while a vertical
+  // drag is left to scroll a tall slide's own content. A move only counts as
+  // a slide change when it's clearly horizontal (|dx| dominates |dy|).
+  const touch = useRef<{ x: number; y: number } | null>(null);
   const onTouchStart = (e: React.TouchEvent) => {
-    touchX.current = e.changedTouches[0]?.clientX ?? null;
+    const t = e.changedTouches[0];
+    touch.current = t ? { x: t.clientX, y: t.clientY } : null;
   };
   const onTouchEnd = (e: React.TouchEvent) => {
-    if (touchX.current === null) return;
-    const dx = (e.changedTouches[0]?.clientX ?? touchX.current) - touchX.current;
-    if (Math.abs(dx) > 48) (dx < 0 ? next : prev)();
-    touchX.current = null;
+    if (touch.current === null) return;
+    const t = e.changedTouches[0];
+    const dx = (t?.clientX ?? touch.current.x) - touch.current.x;
+    const dy = (t?.clientY ?? touch.current.y) - touch.current.y;
+    // horizontal intent: travels far enough AND is more sideways than vertical
+    if (Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy) * 1.3) {
+      (dx < 0 ? next : prev)();
+    }
+    touch.current = null;
   };
 
   const accent = SLIDES[index]?.accent ?? COLOR.sky;
@@ -136,14 +145,19 @@ export default function DeckPage() {
       </div>
 
       {/* ── Slide stage ───────────────────────────────────────────────── */}
-      <section className="relative z-10 min-h-0 flex-1">
+      {/* Scrolls vertically (tall slides on small screens scroll instead of
+          clipping) and clips horizontally so a slide can never produce a
+          page-level horizontal scrollbar. */}
+      <section className="relative z-10 min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain">
         <div
           key={animKey}
-          className="absolute inset-0 deck-slide-in"
+          className="deck-slide-in min-h-full"
           style={
             {
-              // start offset depends on direction; CSS animation slides to 0
-              ["--from" as string]: dir >= 0 ? "44px" : "-44px",
+              // Entrance rises vertically (direction-aware). Vertical motion
+              // never spills past the viewport width, so it stays overflow-safe
+              // at any size — unlike a horizontal slide inside a clipped stage.
+              ["--from-y" as string]: dir >= 0 ? "40px" : "-40px",
             } as React.CSSProperties
           }
         >
@@ -152,8 +166,11 @@ export default function DeckPage() {
       </section>
 
       {/* ── Dot-nav / section list ────────────────────────────────────── */}
+      {/* Touch-friendly: each control reserves a ≥44px tap target (min-w/-h)
+          while the visible dot stays small; the text labels only appear at lg
+          so phones get clean, uncramped dots. */}
       <nav
-        className="relative z-10 flex items-center justify-center gap-2 px-4 py-3"
+        className="relative z-10 flex shrink-0 items-center justify-center gap-0.5 px-3 py-2 sm:gap-2 sm:py-3"
         aria-label="slides"
       >
         {SLIDES.map((s, i) => {
@@ -166,14 +183,14 @@ export default function DeckPage() {
               title={`${i + 1}. ${s.label}`}
               aria-label={`Slide ${i + 1}: ${s.label}`}
               aria-current={active ? "true" : undefined}
-              className="group flex flex-col items-center gap-1.5 px-1 py-1"
+              className="group flex min-h-11 min-w-9 flex-col items-center justify-center gap-1.5 px-1 sm:min-w-0 lg:min-h-0 lg:py-1"
             >
               <span
                 className="block rounded-full transition-all duration-300"
                 style={{
-                  width: active ? 26 : 8,
-                  height: 8,
-                  background: active ? accent : "rgba(255,255,255,0.22)",
+                  width: active ? 26 : 9,
+                  height: 9,
+                  background: active ? accent : "rgba(255,255,255,0.24)",
                   boxShadow: active ? `0 0 10px ${accent}` : "none",
                 }}
               />
@@ -189,12 +206,14 @@ export default function DeckPage() {
       </nav>
 
       {/* ── Prev / Next click targets (edges) ─────────────────────────── */}
+      {/* Desktop affordance only — on touch these would overlap slide content
+          and swallow edge taps, so swipe + the dot-nav drive mobile instead. */}
       <button
         type="button"
         onClick={prev}
         disabled={index === 0}
         aria-label="Previous slide"
-        className="group absolute inset-y-0 left-0 z-20 flex w-16 items-center justify-start pl-3 disabled:pointer-events-none disabled:opacity-0 sm:w-24"
+        className="group absolute inset-y-0 left-0 z-20 hidden w-16 items-center justify-start pl-3 disabled:pointer-events-none disabled:opacity-0 md:flex lg:w-24"
       >
         <span
           className="flex h-10 w-10 items-center justify-center rounded-full border text-lg opacity-40 transition-all group-hover:opacity-100"
@@ -208,7 +227,7 @@ export default function DeckPage() {
         onClick={next}
         disabled={index === COUNT - 1}
         aria-label="Next slide"
-        className="group absolute inset-y-0 right-0 z-20 flex w-16 items-center justify-end pr-3 disabled:pointer-events-none disabled:opacity-0 sm:w-24"
+        className="group absolute inset-y-0 right-0 z-20 hidden w-16 items-center justify-end pr-3 disabled:pointer-events-none disabled:opacity-0 md:flex lg:w-24"
       >
         <span
           className="flex h-10 w-10 items-center justify-center rounded-full border text-lg opacity-40 transition-all group-hover:opacity-100"
@@ -221,15 +240,15 @@ export default function DeckPage() {
       {/* component-scoped animation (no globals.css edits) */}
       <style>{`
         @keyframes deckSlideIn {
-          from { opacity: 0; transform: translateX(var(--from, 44px)); }
-          to   { opacity: 1; transform: translateX(0); }
+          from { opacity: 0; transform: translateY(var(--from-y, 40px)); }
+          to   { opacity: 1; transform: translateY(0); }
         }
         .deck-slide-in {
           animation: deckSlideIn 480ms cubic-bezier(0.22, 1, 0.36, 1) both;
           will-change: opacity, transform;
         }
         @media (prefers-reduced-motion: reduce) {
-          .deck-slide-in { animation-duration: 1ms; }
+          .deck-slide-in { animation: none; }
         }
       `}</style>
     </main>

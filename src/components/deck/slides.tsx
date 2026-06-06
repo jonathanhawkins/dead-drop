@@ -30,9 +30,13 @@ function Slide({
   children: ReactNode;
   className?: string;
 }) {
+  // min-h-full (not h-full): the slide fills the stage when content is short
+  // (so justify-center keeps it vertically centered) but is allowed to grow
+  // taller than the viewport on small screens — the stage then scrolls it
+  // rather than clipping. Padding tightens on phones to buy vertical room.
   return (
     <div
-      className={`mx-auto flex h-full w-full max-w-6xl flex-col justify-center px-6 py-10 sm:px-10 sm:py-14 ${className}`}
+      className={`mx-auto flex min-h-full w-full max-w-6xl flex-col justify-center px-5 py-8 sm:px-10 sm:py-14 ${className}`}
     >
       {children}
     </div>
@@ -141,7 +145,7 @@ function HookSlide() {
         the tech wasn&apos;t there. Three things changed.
       </p>
 
-      <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-3 sm:grid-cols-[10rem_1fr_1fr] sm:gap-x-5">
+      <div className="grid grid-cols-1 gap-x-3 gap-y-2.5 sm:grid-cols-[10rem_1fr_1fr] sm:gap-x-5 sm:gap-y-3">
         {/* header row (desktop) */}
         <div className="hidden sm:block" />
         <div className="hidden font-mono text-[11px] uppercase tracking-[0.24em] text-white/40 sm:block">
@@ -176,7 +180,7 @@ function RowGroup({
   return (
     <>
       <div
-        className="col-span-2 mt-2 font-mono text-[11px] uppercase tracking-[0.2em] sm:col-span-1 sm:mt-0 sm:self-center"
+        className="mt-2 font-mono text-[11px] uppercase tracking-[0.2em] sm:mt-0 sm:self-center"
         style={{ color: accent }}
       >
         {axis}
@@ -443,7 +447,10 @@ function BrainSlide() {
         fix the lie — that gap is the drama.
       </p>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-3">
+      {/* On phones the three scopes stack and grow with their content (the
+          whole slide scrolls). Only on lg do they share a fixed-height row and
+          scroll internally, as on the projector. */}
+      <div className="grid grid-cols-1 gap-3 lg:min-h-0 lg:flex-1 lg:grid-cols-3">
         <ScopeColumn scope="world" facts={world} />
         <ScopeColumn scope="player" facts={player} />
         <ScopeColumn scope="handler" facts={handler} />
