@@ -56,6 +56,29 @@ export const HANDLER_PERSONA = [
 ].join(" ");
 
 // ---------------------------------------------------------------------------
+// Codename capture — at the top of the intro the Handler asks the operative to
+// pick a handle. CODENAME_ASK is the request; sanitizeCodename cleans the reply
+// into a short call sign for the roster + the Handler's form of address.
+// ---------------------------------------------------------------------------
+export const CODENAME_ASK =
+  "Channel secure. Before we move, operative — I need a handle for you. " +
+  "What do I call you? One word, keep it clean.";
+
+/** Clean a freeform reply ("call me Ghost") into a short call sign, or null. */
+export function sanitizeCodename(raw: string | undefined | null): string | null {
+  let s = (raw ?? "").trim();
+  if (!s) return null;
+  s = s.replace(
+    /^(call me|i am|i'?m|im|my name is|name'?s|the name'?s|codename|call sign|handle|it'?s|this is)\s+/i,
+    "",
+  );
+  s = (s.split(/[\n\r]/)[0] ?? "").replace(/[^\p{L}\p{N} _'\-]/gu, "").trim();
+  if (!s) return null;
+  const capped = s.split(/\s+/).slice(0, 3).join(" ").slice(0, 24).trim();
+  return capped || null;
+}
+
+// ---------------------------------------------------------------------------
 // WORLD_FACTS — seeded once per world (and the Handler's private intel).
 // `world` scope = objective truth visible to all. `handler-secret` = the
 // Handler's private knowledge that NEVER auto-corrects a player belief.

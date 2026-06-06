@@ -18,7 +18,8 @@ import {
 import { describeImage, toJpegDataUrl } from "./ai";
 import { fetchAttachmentBytes } from "./photon";
 import { seedWorldFacts, readPlayerMemory } from "./memory";
-import { classify, runBeat } from "./game";
+import { classify, runBeat, looksLikePassphrase } from "./game";
+import { CODENAME_ASK, sanitizeCodename } from "./content";
 import { env } from "./env";
 import type {
   GameState,
@@ -32,6 +33,39 @@ import type {
 
 if (typeof window !== "undefined") {
   throw new Error("loop.ts is server-only (it orchestrates secret-bearing modules).");
+}
+
+// ---------------------------------------------------------------------------
+// Codename capture — at the intro beat we ask the operative for a handle and
+// store their reply on players.codename. Kill-switch: set CODENAME_CAPTURE=false
+// to revert to the original flow instantly. Arrival pings / the safe word / a
+// passphrase are never mistaken for a codename (they fall through to the machine).
+// ---------------------------------------------------------------------------
+const CODENAME_CAPTURE = process.env.CODENAME_CAPTURE !== "false";
+const ARRIVAL_PING = /\b(here|arrived|on site|in position|made it|i'?m here|ready|ok|okay|done)\b/i;
+
+function isReservedFirstWord(text: string): boolean {
+  if (text.toUpperCase().replace(/[^A-Z]+/g, "") === "ABORT") return true; // safe word
+  if (looksLikePassphrase(text)) return true; // a passphrase attempt, not a name
+  if (ARRIVAL_PING.test(text)) return true; // arrival ping → presence flow, not a name
+  return false;
+}
+
+function codenameAskReply(): HandlerReply {
+  return { text: CODENAME_ASK, beat: "intro", classification: "freeform", typing: true };
+}
+
+function heldIntroTurn(player: Player, session: Session, reply: HandlerReply): TurnResult {
+  return {
+    player,
+    session,
+    stateBefore: "intro",
+    stateAfter: "intro",
+    classification: "freeform",
+    reply,
+    factsWritten: 0,
+    reconciled: false,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -101,6 +135,7 @@ async function createState(sessionId: string, playerId: string): Promise<GameSta
     final_answer: null,
     wearing: null,
     override_advance: false,
+    codename_asked: false,
   });
 }
 
@@ -384,6 +419,45 @@ export async function handleInbound(
   // 3) Log the inbound message (best-effort).
   await logInbound(input, session.id, player.id);
 
+  // 3.5) Codename capture (kill-switchable). At intro, before any proof: the
+  //      first plain-text contact gets a "pick a handle" prompt; the next plain
+  //      reply is stored as their codename. Photos / arrival pings / the safe
+  //      word skip this entirely, so it never gates the mission.
+  if (CODENAME_CAPTURE && state.beat === "intro" && !player.codename) {
+    const text = (input.text ?? "").trim();
+    const plainText =
+      input.kind === "text" &&
+      !!text &&
+      !input.gps &&
+      !input.imageDataUrl &&
+      !input.imageObjectId &&
+      !input.attachmentGuid;
+    if (plainText && !isReservedFirstWord(text)) {
+      if (!state.codename_asked) {
+        try {
+          state = await dbUpdate<GameState>("game_state", state.id, {
+            codename_asked: true,
+            updated_at: new Date().toISOString(),
+          });
+        } catch (err) {
+          console.error("[loop] codename_asked persist failed (continuing):", err);
+        }
+        const reply = codenameAskReply();
+        await logOutbound(reply, input, session.id, player.id);
+        return { reply, turn: heldIntroTurn(player, session, reply) };
+      }
+      const codename = sanitizeCodename(text);
+      if (codename) {
+        try {
+          player = await dbUpdate<Player>("players", player.id, { codename });
+        } catch (err) {
+          console.error("[loop] codename store failed (continuing):", err);
+        }
+      }
+      // fall through → runBeat gives the personalized opener (handle = codename).
+    }
+  }
+
   // 4) Build a Verdict for proof inbounds (vision / gps). A note, not a gate.
   let verdict: Verdict | undefined;
   if (input.kind === "image" || input.imageDataUrl || input.imageObjectId || input.attachmentGuid) {
@@ -422,6 +496,7 @@ export async function handleInbound(
       verdict,
       playerId: player.id,
       sessionId: session.id,
+      handle: player.codename ?? player.handle ?? undefined,
     });
   } catch (err) {
     console.error("[loop] runBeat failed — returning fallback reply:", err);

@@ -56,7 +56,8 @@ export const BEAT_ORDER: Beat[] = [
 export interface Player {
   id: string;
   phone: string;
-  handle?: string | null;
+  handle?: string | null; // the iMessage display name (e.g. "Greg"), if Photon gives one
+  codename?: string | null; // the spy call sign the operative picks at the intro
   created_at: string;
 }
 
@@ -81,6 +82,7 @@ export interface GameState {
   final_answer?: string | null;
   wearing?: string | null;
   override_advance: boolean;
+  codename_asked?: boolean; // true once the Handler has prompted for a codename
   updated_at: string;
   created_at: string;
 }

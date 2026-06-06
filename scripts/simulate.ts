@@ -158,6 +158,17 @@ async function main(): Promise<void> {
   const { player, session, state } = await startSession(PHONE, HANDLE);
   console.log(`\n  session=${session.id}  player=${player.id}  beat=${state.beat}`);
 
+  // 0a) First plain-text contact → the Handler asks for a codename (held at intro).
+  const askTurn = await feed(
+    "0a. First contact (no codename yet)",
+    inbound({ kind: "text", text: "uh, hey — who is this?" }),
+  );
+
+  // 0b) Their next reply becomes their codename ("call me VIPER" → VIPER).
+  await feed("0b. Operative picks a handle", inbound({ kind: "text", text: "call me VIPER" }));
+  const afterName = await startSession(PHONE); // re-read the player to confirm capture
+  console.log(`\n  captured codename = ${afterName.player.codename ?? "(none)"}`);
+
   // 1) intro → cache_recovered : proof-of-presence photo of the banner.
   const bannerDataUrl = await makeBannerDataUrl();
   await feed("1. Proof photo of the drop site", inbound({ kind: "image", imageDataUrl: bannerDataUrl }));
@@ -194,10 +205,14 @@ async function main(): Promise<void> {
   // ---- Assertions: the arc must have landed correctly. ----
   console.log(`\n${HR}\nRESULT`);
   const ok =
+    askTurn.stateAfter === "intro" &&
+    afterName.player.codename === "VIPER" &&
     wearingTurn.stateAfter === "solve" &&
     finalTurn.stateAfter === "signed_off";
 
   const checks: [string, boolean][] = [
+    ["held at intro to ask for a codename", askTurn.stateAfter === "intro"],
+    ["captured the codename VIPER", afterName.player.codename === "VIPER"],
     ["reached solve after wearing description", wearingTurn.stateAfter === "solve"],
     ["reached signed_off after passphrase", finalTurn.stateAfter === "signed_off"],
     ["final passphrase is HALCYON SEVEN", finalTurn.reply.beat === "signed_off"],

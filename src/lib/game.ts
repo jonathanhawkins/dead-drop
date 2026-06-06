@@ -186,8 +186,9 @@ export async function runBeat(a: {
   verdict?: Verdict;
   playerId: string;
   sessionId: string;
+  handle?: string | null; // codename (or iMessage name) — personalizes the Handler
 }): Promise<BeatOutcome> {
-  const { state, input, classification, verdict, playerId, sessionId } = a;
+  const { state, input, classification, verdict, playerId, sessionId, handle } = a;
   const override = !!state.override_advance;
   const target = nextBeat(state.beat, classification, verdict, override);
 
@@ -326,7 +327,7 @@ export async function runBeat(a: {
   const fragmentForPrompt = (statePatch.digital_fragment ?? state.digital_fragment) ?? undefined;
 
   const { system, user } = narrationPrompt(narrationBeat, {
-    handle: undefined, // caller may enrich; handle isn't required for voice
+    handle: handle ?? undefined, // codename/name so the Handler can address them
     playerText: input.text,
     visionDescription,
     classification,

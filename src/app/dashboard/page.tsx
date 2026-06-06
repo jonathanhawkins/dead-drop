@@ -10,7 +10,8 @@
 // Everything is driven by the Butterbase realtime feed via useDashboardState.
 // Client-only; reads NEXT_PUBLIC_* env exclusively. No server imports.
 
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import type { Beat } from "@/lib/types";
 import { BEAT_ORDER } from "@/lib/types";
 import {
@@ -66,10 +67,13 @@ function BeatRail({ beat }: { beat: Beat | null }) {
 
 type PanelKey = "actor" | "courier" | "wire";
 
-export default function DashboardPage() {
+function DashboardView({ initialSession = "" }: { initialSession?: string }) {
   const state = useDashboardState();
   const { factsByScope, scopedMessages, reconciliations, game, status } = state;
-  const [pinnedSession, setPinnedSession] = useState<string>("");
+  // Seed the pinned session from a /dashboard?session=<id> deep-link (e.g. a row
+  // click on the AGENT ROSTER). The operator can still override it via the control
+  // bar's session field; the realtime feed continues to drive the live columns.
+  const [pinnedSession, setPinnedSession] = useState<string>(initialSession);
   const sessionId = pinnedSession || game?.session_id || "";
 
   // Collapse state for the right-rail panels so the operator can fit everything
@@ -210,5 +214,21 @@ export default function DashboardPage() {
         <ControlBar game={game} status={status} onSession={setPinnedSession} />
       </div>
     </main>
+  );
+}
+
+// Reads the optional ?session=<id> deep-link and seeds the view with it. Split
+// out so the useSearchParams() call sits under a Suspense boundary (required by
+// Next 16 so the rest of the route can still prerender).
+function DashboardWithParam() {
+  const initialSession = useSearchParams().get("session")?.trim() ?? "";
+  return <DashboardView initialSession={initialSession} />;
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={<DashboardView />}>
+      <DashboardWithParam />
+    </Suspense>
   );
 }
